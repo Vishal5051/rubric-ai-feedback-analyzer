@@ -1,0 +1,135 @@
+const express = require('express');
+const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
+const axios = require('axios');
+require('dotenv').config();
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+app.use(cors());
+app.use(express.json());
+
+const OLLAMA_URL = 'http://localhost:11434/api/generate';
+const MODEL = 'phi3';
+
+// Load data files
+const getContextData = () => {
+    try {
+        const rubric = fs.readFileSync(path.join(__dirname, '../data/rubric.json'), 'utf8');
+        const context = fs.readFileSync(path.join(__dirname, '../data/context.md'), 'utf8');
+        return { rubric, context };
+    } catch (error) {
+        console.error('Error reading data files:', error);
+        return null;
+    }
+};
+
+app.post('/api/analyze', async (req, res) => {
+    const { transcript } = req.body;
+
+    if (!transcript) {
+        return res.status(400).json({ error: 'Transcript is required' });
+    }
+
+    const data = getContextData();
+    if (!data) {
+        return res.status(500).json({ error: 'Failed to load reference data (rubric/context)' });
+    }
+
+    const prompt = `
+You are an expert performance analyst for the DeepThought Software Developer Internship.
+Your task is to analyze a supervisor feedback transcript for a "DT Fellow" and provide a structured assessment based on the provided Rubric and Context.
+
+### CONTEXT
+${data.context}
+
+### RUBRIC
+${data.rubric}
+
+### TRANSCRIPT TO ANALYZE
+${transcript}
+
+### INSTRUCTIONS
+1. Analyze the transcript for evidence of "Execution" (Layer 1) vs "Systems Building" (Layer 2).
+2. Map findings to the 8 KPIs defined in the context.
+3. Assign a score (1-10) based on the rubric, paying close attention to the 6 vs 7 boundary.
+4. Identify gaps in the assessment dimensions.
+5. Account for potential supervisor biases (Helpfulness, Presence, Halo/Horn, Recency).
+6. Provide specific quotes as evidence.
+7. Return the analysis in STRICT JSON format exactly as follows:
+
+{
+  "score": {
+    "value": number,
+    "label": "string",
+    "band": "string",
+    "justification": "string"
+  },
+  "evidence": [
+    {
+      "quote": "string",
+      "signal": "positive | negative",
+      "dimension": "string",
+      "interpretation": "string"
+    }
+  ],
+  "kpiMapping": [
+    {
+      "kpi": "string",
+      "evidence": "string",
+      "systemOrPersonal": "system | personal"
+    }
+  ],
+  "gaps": [
+    {
+      "dimension": "string",
+      "detail": "string"
+    }
+  ],
+  "followUpQuestions": [
+    {
+      "question": "string",
+      "targetGap": "string",
+      "lookingFor": "string"
+    }
+  ]
+}
+
+Only return the JSON. Do not include any other text.
+`;
+
+    try {
+        const response = await axios.post(OLLAMA_URL, {
+            model: MODEL,
+            prompt: prompt,
+            stream: false,
+            format: 'json'
+        });
+
+        const result = response.data.response;
+        
+        // Sometimes Ollama might return the JSON inside a markdown block or with extra text
+        // But with format: 'json' it should be cleaner.
+        try {
+            const jsonResult = JSON.parse(result);
+            res.json(jsonResult);
+        } catch (parseError) {
+            console.error('Error parsing Ollama response:', result);
+            res.status(500).json({ error: 'Failed to parse AI response', raw: result });
+        }
+
+    } catch (error) {
+        console.error('Error calling Ollama:', error.message);
+        if (error.code === 'ECONNREFUSED') {
+            res.status(503).json({ error: 'Ollama is not running. Please start Ollama at http://localhost:11434' });
+        } else {
+            res.status(500).json({ error: 'Analysis failed', details: error.message });
+        }
+    }
+});
+
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
