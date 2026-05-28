@@ -26,6 +26,10 @@ const getContextData = () => {
     }
 };
 
+app.get('/', (req, res) => {
+    res.json({ status: 'ok', message: 'RubricAI Backend API is running successfully' });
+});
+
 app.post('/api/analyze', async (req, res) => {
     const { transcript } = req.body;
 
