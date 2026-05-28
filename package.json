@@ -1,5 +1,5 @@
 {
-  "name": "trinethra-feedback-analyzer",
+  "name": "rubric-ai-feedback-analyzer",
   "version": "1.0.0",
   "scripts": {
     "start:server": "cd server && node index.js",

@@ -1,4 +1,4 @@
-# Walkthrough - Trinethra Feedback Analyzer
+# Walkthrough - RubricAI
 
 I have successfully created the full-stack application.
 

@@ -53,7 +53,7 @@ function App() {
             <div className="bg-indigo-600 p-2 rounded-lg">
               <FileSearch className="text-white w-6 h-6" />
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-800">Trinethra</h1>
+            <h1 className="text-xl font-bold tracking-tight text-slate-800">RubricAI</h1>
           </div>
           <div className="flex items-center gap-2 px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-semibold uppercase tracking-wider border border-amber-200">
             <AlertCircle className="w-3.5 h-3.5" />
