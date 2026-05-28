@@ -11,8 +11,8 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-const OLLAMA_URL = 'http://localhost:11434/api/generate';
-const MODEL = 'phi3';
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434/api/generate';
+const MODEL = process.env.MODEL || 'phi3';
 
 // Load data files
 const getContextData = () => {
@@ -100,15 +100,38 @@ ${transcript}
 Only return the JSON. Do not include any other text.
 `;
 
-    try {
-        const response = await axios.post(OLLAMA_URL, {
-            model: MODEL,
-            prompt: prompt,
-            stream: false,
-            format: 'json'
-        });
+    const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-        const result = response.data.response;
+    try {
+        let result;
+        if (GROQ_API_KEY) {
+            // Use Groq API
+            const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+                model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                response_format: { type: 'json_object' }
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${GROQ_API_KEY}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            result = response.data.choices[0].message.content;
+        } else {
+            // Fallback to Ollama
+            const response = await axios.post(OLLAMA_URL, {
+                model: MODEL,
+                prompt: prompt,
+                stream: false,
+                format: 'json'
+            });
+            result = response.data.response;
+        }
         
         try {
             const jsonResult = JSON.parse(result);
@@ -120,16 +143,16 @@ Only return the JSON. Do not include any other text.
             
             res.json(jsonResult);
         } catch (parseError) {
-            console.error('Error parsing Ollama response:', result);
+            console.error('Error parsing AI response:', result);
             res.status(500).json({ error: 'Failed to parse AI response', raw: result });
         }
 
     } catch (error) {
-        console.error('Error calling Ollama:', error.message);
+        console.error('Error calling AI:', error.message);
         if (error.code === 'ECONNREFUSED') {
-            res.status(503).json({ error: 'Ollama is not running. Please start Ollama at http://localhost:11434' });
+            res.status(503).json({ error: 'Ollama is not running. Please start Ollama or configure GROQ_API_KEY.' });
         } else {
-            res.status(500).json({ error: 'Analysis failed', details: error.message });
+            res.status(500).json({ error: 'Analysis failed', details: error.response?.data?.error?.message || error.message });
         }
     }
 });
