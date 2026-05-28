@@ -30,6 +30,14 @@ app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'RubricAI Backend API is running successfully' });
 });
 
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        groq_api_key_configured: !!process.env.GROQ_API_KEY,
+        groq_model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+    });
+});
+
 app.post('/api/analyze', async (req, res) => {
     const { transcript } = req.body;
 
